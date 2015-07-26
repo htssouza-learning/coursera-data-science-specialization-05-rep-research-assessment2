@@ -20,8 +20,12 @@ storm_data_url <-
     "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(storm_data_url, destfile = "stormdata.csv.bz2", method = "curl")
 storm_data <- read.csv(bzfile("stormdata.csv.bz2"))
+```
+
+Sample data:
+
+```{r echo = TRUE} 
 str(storm_data)
-head(storm_data)
 ```
 
 Considering only (valid) states of United States:
@@ -51,6 +55,10 @@ storm_data$PROPDMG[storm_data$PROPDMGEXP == "K"] <-
     (storm_data$PROPDMG[storm_data$PROPDMGEXP == "K"] * 1000)
 storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "K"] <- ""
 
+storm_data$PROPDMG[storm_data$PROPDMGEXP == "k"] <-
+    (storm_data$PROPDMG[storm_data$PROPDMGEXP == "k"] * 1000)
+storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "k"] <- ""
+
 storm_data$PROPDMG[storm_data$PROPDMGEXP == "M"] <-
     (storm_data$PROPDMG[storm_data$PROPDMGEXP == "M"] * 1000 * 1000)
 storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "M"] <- ""
@@ -63,7 +71,11 @@ storm_data$PROPDMG[storm_data$PROPDMGEXP == "B"] <-
     (storm_data$PROPDMG[storm_data$PROPDMGEXP == "B"] * 1000 * 1000 * 1000)
 storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "B"] <- ""
 
-for(exp in c("0","1","2","3","4","5","6","7","8")) {
+storm_data$PROPDMG[storm_data$PROPDMGEXP == "b"] <-
+    (storm_data$PROPDMG[storm_data$PROPDMGEXP == "b"] * 1000 * 1000 * 1000)
+storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "b"] <- ""
+
+for(exp in as.character(1:10)) {
     storm_data$PROPDMG[storm_data$PROPDMGEXP == exp] <-
         (storm_data$PROPDMG[storm_data$PROPDMGEXP == exp] * (10 ^ as.integer(exp)))
     storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == exp] <- ""
@@ -71,201 +83,136 @@ for(exp in c("0","1","2","3","4","5","6","7","8")) {
 
 ```
 
-Considering the data with valid property manage:
+Normalizing Crop damage:
+
+```{r echo = TRUE} 
+
+storm_data$CROPDMG[storm_data$CROPDMGEXP == "K"] <-
+    (storm_data$CROPDMG[storm_data$CROPDMGEXP == "K"] * 1000)
+storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == "K"] <- ""
+
+storm_data$CROPDMG[storm_data$CROPDMGEXP == "k"] <-
+    (storm_data$CROPDMG[storm_data$CROPDMGEXP == "k"] * 1000)
+storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == "k"] <- ""
+
+storm_data$CROPDMG[storm_data$CROPDMGEXP == "M"] <-
+    (storm_data$CROPDMG[storm_data$CROPDMGEXP == "M"] * 1000 * 1000)
+storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == "M"] <- ""
+
+storm_data$CROPDMG[storm_data$CROPDMGEXP == "m"] <-
+    (storm_data$CROPDMG[storm_data$CROPDMGEXP == "m"] * 1000 * 1000)
+storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == "m"] <- ""
+
+storm_data$CROPDMG[storm_data$CROPDMGEXP == "B"] <-
+    (storm_data$CROPDMG[storm_data$CROPDMGEXP == "B"] * 1000 * 1000 * 1000)
+storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == "B"] <- ""
+
+storm_data$CROPDMG[storm_data$CROPDMGEXP == "b"] <-
+    (storm_data$CROPDMG[storm_data$CROPDMGEXP == "b"] * 1000 * 1000 * 1000)
+storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == "b"] <- ""
+
+for(exp in as.character(1:10)) {
+    storm_data$CROPDMG[storm_data$CROPDMGEXP == exp] <-
+        (storm_data$CROPDMG[storm_data$CROPDMGEXP == exp] * (10 ^ as.integer(exp)))
+    storm_data$CROPDMGEXP[storm_data$CROPDMGEXP == exp] <- ""
+}
+
+```
+
+
+Considering the data with valid property and crop manage:
 
 ```{r echo = TRUE} 
 storm_data <- storm_data[storm_data$PROPDMGEXP == "",]
+storm_data <- storm_data[storm_data$CROPDMGEXP == "",]
 ```
 
-Computing harm per event type:
+Computing population harm per state and event type:
 
 ```{r echo = TRUE} 
-
-harm_per_evtype <- aggregate(
-    storm_data[c("FATALITIES", "INJURIES", "PROPDMG")],
-    by=storm_data["EVTYPE"],
+pop_harm_per_evtype <- aggregate(
+    storm_data[c("FATALITIES", "INJURIES")],
+    by=storm_data[c("STATE", "EVTYPE")],
     FUN=sum)
 
+pop_harm_per_evtype <-
+    pop_harm_per_evtype [
+        (pop_harm_per_evtype$FATALITIES +
+        pop_harm_per_evtype$INJURIES)  > 0
+    ,]
+
+pop_harm_per_evtype <- pop_harm_per_evtype[
+    order(
+        pop_harm_per_evtype$STATE,
+        -pop_harm_per_evtype$FATALITIES,
+        -pop_harm_per_evtype$INJURIES
+    ),
+]
+
 ```
 
-Checking histogram:
-```{r echo = TRUE} 
-hist(storm_data$FATALITIES)
-hist(storm_data$INJURIES)
-hist(storm_data$PROPDMG)
-
-```
-
-
-
-
-Aggregating data over event type and state:
-
-
-## What is mean total number of steps taken per day?
-
-1. Calculate the total number of steps taken per day:
-
-```{r echo = TRUE} 
-with_steps <- activity[!is.na(activity$steps),]
-daily_steps <- aggregate(with_steps["steps"], by=with_steps["date"], FUN=sum)
-head(daily_steps)
-```
-
-2. If you do not understand the difference between a histogram and a barplot,
-research the difference between them. Make a histogram of the total number of
-steps taken each day
-
-```{r echo = TRUE} 
-hist(daily_steps$steps,
-     main = "Histogram of total number os steps taken per day",
-     xlab = "Total steps per day",
-     ylab = "Number of days these activity repeats",
-     col = c("red"),
-     breaks = 20)
-```
-
-3. Calculate and report the mean and median of the total number of steps taken per day
-
-```{r echo = TRUE} 
-average_steps_per_day <- mean(daily_steps$steps)
-average_steps_per_day
-
-median_steps_per_day <- median(daily_steps$steps)
-median_steps_per_day
-```
-
-## What is the average daily activity pattern?
-
-1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis)
-and the average number of steps taken, averaged across all days (y-axis)
-
-```{r echo = TRUE} 
-per_interval <- aggregate(
-    with_steps["steps"],
-    by=with_steps["interval"],
-    FUN=mean)
-head(per_interval)
-
-plot(per_interval$interval,
-     per_interval$steps,
-     main = "Daily activity pattern",
-     ylab = "Average steps per day",
-     xlab = "Interval",
-     type = "l",
-     col = c("red"))
-```
-  
-2. Which 5-minute interval, on average across all the days in the dataset,
-contains the maximum number of steps?
-
-```{r echo = TRUE} 
-max_steps = max (per_interval$steps)
-per_interval[per_interval$steps == max_steps, "interval"]
-```
-
-## Imputing missing values
-
-1. Calculate and report the total number of missing values in the dataset
-(i.e. the total number of rows with NAs)
-
-```{r echo = TRUE} 
-nrow(activity[is.na(activity$steps),])
-```
-
-2. Devise a strategy for filling in all of the missing values in the dataset.
-The strategy does not need to be sophisticated. For example, you could use the
-mean/median for that day, or the mean for that 5-minute interval, etc.
-
-*Median for that 5-minutes interval will be used*
-
-3. Create a new dataset that is equal to the original dataset but with the missing
-data filled in.
-
-```{r echo = TRUE} 
-per_interval_copy <- per_interval
-names(per_interval_copy)[names(per_interval_copy)=="steps"] <- "median_steps_interval"
-
-activity_fill <- merge(activity, per_interval_copy)
-
-activity_fill[is.na(activity_fill$steps), "steps"] <-
-    activity_fill[is.na(activity_fill$steps), "median_steps_interval"]
-activity_fill <- activity_fill[, names(activity_fill)!="median_steps_interval"]
-```
-
-4. Make a histogram of the total number of steps taken each day and Calculate
-and report the mean and median total number of steps taken per day.
-Do these values differ from the estimates from the first part of the assignment?
-What is the impact of imputing missing data on the estimates of the total daily
-number of steps?
-
-```{r echo = TRUE} 
-daily_steps_fill <- aggregate(activity_fill["steps"], by=activity_fill["date"], FUN=sum)
-head(daily_steps_fill)
-
-hist(daily_steps_fill$steps,
-     main = "Histogram of total number os steps taken per day",
-     xlab = "Total steps per day",
-     ylab = "Number of days these activity repeats",
-     col = c("red"),
-     breaks = 20)
-
-average_steps_per_day_fill <- mean(daily_steps_fill$steps)
-average_steps_per_day_fill
-
-median_steps_per_day_fill <- median(daily_steps_fill$steps)
-median_steps_per_day_fill
-```
-
-*No big changes on the numbers computed previously.*
-
-## Are there differences in activity patterns between weekdays and weekends?
-
-1. Create a new factor variable in the dataset with two levels – “weekday” and
-“weekend” indicating whether a given date is a weekday or weekend day.
-
-```{r echo = TRUE} 
-Sys.setlocale("LC_TIME", "en_US")
-
-activity_fill$weekday <- weekdays(
-    as.Date(activity_fill$date, abbreviate = TRUE))
-
-activity_fill[
-    activity_fill$weekday %in% c("Sunday", "Saturday"),
-    "weekday_type"] <- "weekend"
-
-activity_fill[is.na(activity_fill$weekday_type), "weekday_type"] <- "weekday"
-activity_fill$weekday_type <- factor(activity_fill$weekday_type)
-
-str(activity_fill)
-    
-```
-
-2. Make a panel plot containing a time series plot (i.e. type = "l") of the
-5-minute interval (x-axis) and the average number of steps taken, averaged
-across all weekday days or weekend days (y-axis). See the README file in the
-GitHub repository to see an example of what this plot should look like using
-simulated data.
+Filtering the most population harmful event per state:
 
 ```{r echo = TRUE} 
 
-per_interval_n_weekday <- aggregate(
-    activity_fill["steps"],
-    by=activity_fill[c("interval", "weekday_type")],
-    FUN=mean)
+pop_harm_per_evtype$temp <- (
+    pop_harm_per_evtype$FATALITIES * 1000000 + 
+    pop_harm_per_evtype$INJURIES
+)
 
-library(plyr)
-library(ggplot2)
+pop_harm_top_type_per_state <- aggregate(
+    temp ~ STATE, pop_harm_per_evtype, max
+)
 
-qplot(
-  interval,
-  steps,
-  data = per_interval_n_weekday,
-  facets = weekday_type ~ .,
-  geom = c("line"))
-  
+pop_harm_top_type_per_state <- merge (
+    pop_harm_top_type_per_state, pop_harm_per_evtype)
+
+pop_harm_top_type_per_state <- pop_harm_top_type_per_state[,
+    names(pop_harm_top_type_per_state) != "temp"
+]
+
 ```
- 
- 
+
+Computing economical (property and crop) damage per state and event type:
+
+```{r echo = TRUE} 
+
+storm_data$ECODMG <- (storm_data$PROPDMG + storm_data$CROPDMG)
+
+eco_harm_per_evtype <- aggregate(
+    storm_data["ECODMG"],
+    by=storm_data[c("STATE", "EVTYPE")],
+    FUN=sum)
+
+eco_harm_per_evtype <-
+    eco_harm_per_evtype [        
+        eco_harm_per_evtype$ECODMG  > 0
+    ,]
+
+eco_harm_per_evtype <- eco_harm_per_evtype[
+    order(
+        eco_harm_per_evtype$STATE,
+        -eco_harm_per_evtype$ECODMG
+    ),
+]
+
+```
+
+Filtering the most economical harmful event per state:
+
+```{r echo = TRUE} 
+
+eco_harm_top_type_per_state <- aggregate(
+    ECODMG ~ STATE, eco_harm_per_evtype, max
+)
+
+eco_harm_top_type_per_state <- merge (
+    eco_harm_top_type_per_state, eco_harm_per_evtype)
+
+]
+
+```
+
+
 
 
