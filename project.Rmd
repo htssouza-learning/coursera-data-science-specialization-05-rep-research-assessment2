@@ -1,0 +1,271 @@
+---
+title: 'Reproducible Research: Peer Assessment 2'
+subtitle: by Henrique Souza (github.com/htssouza)
+output:
+  html_document:
+    keep_md: yes
+    pandoc_args: [
+      "+RTS", "-K64m",
+      "-RTS"
+    ]
+        
+---
+
+# Data Processing
+
+Downloading and loading the data:
+
+```{r echo = TRUE} 
+storm_data_url <- 
+    "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(storm_data_url, destfile = "stormdata.csv.bz2", method = "curl")
+storm_data <- read.csv(bzfile("stormdata.csv.bz2"))
+str(storm_data)
+head(storm_data)
+```
+
+Considering only (valid) states of United States:
+
+```{r echo = TRUE} 
+us_states_and_dc <- 
+c("DC", "AL","MT","AK","NE","AZ","NV","AR","NH","CA","NJ","CO","NM","CT","NY",
+"DE","NC","FL","ND","GA","OH","HI","OK","ID","OR","IL","PA","IN","RI",
+"IA","SC","KS","SD","KY","TN","LA","TX","ME","UT","MD","VT","MA","VA",
+"MI","WA","MN","WV","MS","WI","MO","WY")
+
+storm_data <- storm_data[storm_data$STATE %in% us_states_and_dc,]
+```
+
+Converting dates columns:
+
+```{r echo = TRUE} 
+storm_data$BGN_DATE <- as.Date(storm_data$BGN_DATE, "%m/%d/%Y")
+storm_data$END_DATE <- as.Date(storm_data$END_DATE, "%m/%d/%Y")
+```
+
+Normalizing Property damage:
+
+```{r echo = TRUE} 
+
+storm_data$PROPDMG[storm_data$PROPDMGEXP == "K"] <-
+    (storm_data$PROPDMG[storm_data$PROPDMGEXP == "K"] * 1000)
+storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "K"] <- ""
+
+storm_data$PROPDMG[storm_data$PROPDMGEXP == "M"] <-
+    (storm_data$PROPDMG[storm_data$PROPDMGEXP == "M"] * 1000 * 1000)
+storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "M"] <- ""
+
+storm_data$PROPDMG[storm_data$PROPDMGEXP == "m"] <-
+    (storm_data$PROPDMG[storm_data$PROPDMGEXP == "m"] * 1000 * 1000)
+storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "m"] <- ""
+
+storm_data$PROPDMG[storm_data$PROPDMGEXP == "B"] <-
+    (storm_data$PROPDMG[storm_data$PROPDMGEXP == "B"] * 1000 * 1000 * 1000)
+storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == "B"] <- ""
+
+for(exp in c("0","1","2","3","4","5","6","7","8")) {
+    storm_data$PROPDMG[storm_data$PROPDMGEXP == exp] <-
+        (storm_data$PROPDMG[storm_data$PROPDMGEXP == exp] * (10 ^ as.integer(exp)))
+    storm_data$PROPDMGEXP[storm_data$PROPDMGEXP == exp] <- ""
+}
+
+```
+
+Considering the data with valid property manage:
+
+```{r echo = TRUE} 
+storm_data <- storm_data[storm_data$PROPDMGEXP == "",]
+```
+
+Computing harm per event type:
+
+```{r echo = TRUE} 
+
+harm_per_evtype <- aggregate(
+    storm_data[c("FATALITIES", "INJURIES", "PROPDMG")],
+    by=storm_data["EVTYPE"],
+    FUN=sum)
+
+```
+
+Checking histogram:
+```{r echo = TRUE} 
+hist(storm_data$FATALITIES)
+hist(storm_data$INJURIES)
+hist(storm_data$PROPDMG)
+
+```
+
+
+
+
+Aggregating data over event type and state:
+
+
+## What is mean total number of steps taken per day?
+
+1. Calculate the total number of steps taken per day:
+
+```{r echo = TRUE} 
+with_steps <- activity[!is.na(activity$steps),]
+daily_steps <- aggregate(with_steps["steps"], by=with_steps["date"], FUN=sum)
+head(daily_steps)
+```
+
+2. If you do not understand the difference between a histogram and a barplot,
+research the difference between them. Make a histogram of the total number of
+steps taken each day
+
+```{r echo = TRUE} 
+hist(daily_steps$steps,
+     main = "Histogram of total number os steps taken per day",
+     xlab = "Total steps per day",
+     ylab = "Number of days these activity repeats",
+     col = c("red"),
+     breaks = 20)
+```
+
+3. Calculate and report the mean and median of the total number of steps taken per day
+
+```{r echo = TRUE} 
+average_steps_per_day <- mean(daily_steps$steps)
+average_steps_per_day
+
+median_steps_per_day <- median(daily_steps$steps)
+median_steps_per_day
+```
+
+## What is the average daily activity pattern?
+
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis)
+and the average number of steps taken, averaged across all days (y-axis)
+
+```{r echo = TRUE} 
+per_interval <- aggregate(
+    with_steps["steps"],
+    by=with_steps["interval"],
+    FUN=mean)
+head(per_interval)
+
+plot(per_interval$interval,
+     per_interval$steps,
+     main = "Daily activity pattern",
+     ylab = "Average steps per day",
+     xlab = "Interval",
+     type = "l",
+     col = c("red"))
+```
+  
+2. Which 5-minute interval, on average across all the days in the dataset,
+contains the maximum number of steps?
+
+```{r echo = TRUE} 
+max_steps = max (per_interval$steps)
+per_interval[per_interval$steps == max_steps, "interval"]
+```
+
+## Imputing missing values
+
+1. Calculate and report the total number of missing values in the dataset
+(i.e. the total number of rows with NAs)
+
+```{r echo = TRUE} 
+nrow(activity[is.na(activity$steps),])
+```
+
+2. Devise a strategy for filling in all of the missing values in the dataset.
+The strategy does not need to be sophisticated. For example, you could use the
+mean/median for that day, or the mean for that 5-minute interval, etc.
+
+*Median for that 5-minutes interval will be used*
+
+3. Create a new dataset that is equal to the original dataset but with the missing
+data filled in.
+
+```{r echo = TRUE} 
+per_interval_copy <- per_interval
+names(per_interval_copy)[names(per_interval_copy)=="steps"] <- "median_steps_interval"
+
+activity_fill <- merge(activity, per_interval_copy)
+
+activity_fill[is.na(activity_fill$steps), "steps"] <-
+    activity_fill[is.na(activity_fill$steps), "median_steps_interval"]
+activity_fill <- activity_fill[, names(activity_fill)!="median_steps_interval"]
+```
+
+4. Make a histogram of the total number of steps taken each day and Calculate
+and report the mean and median total number of steps taken per day.
+Do these values differ from the estimates from the first part of the assignment?
+What is the impact of imputing missing data on the estimates of the total daily
+number of steps?
+
+```{r echo = TRUE} 
+daily_steps_fill <- aggregate(activity_fill["steps"], by=activity_fill["date"], FUN=sum)
+head(daily_steps_fill)
+
+hist(daily_steps_fill$steps,
+     main = "Histogram of total number os steps taken per day",
+     xlab = "Total steps per day",
+     ylab = "Number of days these activity repeats",
+     col = c("red"),
+     breaks = 20)
+
+average_steps_per_day_fill <- mean(daily_steps_fill$steps)
+average_steps_per_day_fill
+
+median_steps_per_day_fill <- median(daily_steps_fill$steps)
+median_steps_per_day_fill
+```
+
+*No big changes on the numbers computed previously.*
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+1. Create a new factor variable in the dataset with two levels – “weekday” and
+“weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r echo = TRUE} 
+Sys.setlocale("LC_TIME", "en_US")
+
+activity_fill$weekday <- weekdays(
+    as.Date(activity_fill$date, abbreviate = TRUE))
+
+activity_fill[
+    activity_fill$weekday %in% c("Sunday", "Saturday"),
+    "weekday_type"] <- "weekend"
+
+activity_fill[is.na(activity_fill$weekday_type), "weekday_type"] <- "weekday"
+activity_fill$weekday_type <- factor(activity_fill$weekday_type)
+
+str(activity_fill)
+    
+```
+
+2. Make a panel plot containing a time series plot (i.e. type = "l") of the
+5-minute interval (x-axis) and the average number of steps taken, averaged
+across all weekday days or weekend days (y-axis). See the README file in the
+GitHub repository to see an example of what this plot should look like using
+simulated data.
+
+```{r echo = TRUE} 
+
+per_interval_n_weekday <- aggregate(
+    activity_fill["steps"],
+    by=activity_fill[c("interval", "weekday_type")],
+    FUN=mean)
+
+library(plyr)
+library(ggplot2)
+
+qplot(
+  interval,
+  steps,
+  data = per_interval_n_weekday,
+  facets = weekday_type ~ .,
+  geom = c("line"))
+  
+```
+ 
+ 
+
+
