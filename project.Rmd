@@ -1,21 +1,41 @@
 ---
-title: 'Reproducible Research: Peer Assessment 2'
+title: 'The most harmful weather events accross United States '
 subtitle: by Henrique Souza (github.com/htssouza)
 output:
   html_document:
     keep_md: yes
-    pandoc_args: [
-      "+RTS", "-K64m",
-      "-RTS"
-    ]
-        
+    pandoc_args:
+    - +RTS
+    - -K512m
+    - -RTS
 ---
+
+# Synopsis
+
+In this report we will indicate the most harmful weather
+events accross Unites States.
+
+This information will be useful in order to concentrate
+the efforts to mitigate and prevent damages caused by 
+these severe events.
 
 # Data Processing
 
-Downloading and loading the data:
+Loading dependency libraries:
 
 ```{r echo = TRUE} 
+library(ggplot2)
+```
+
+Sets locale:
+
+```{r echo = TRUE} 
+Sys.setlocale("LC_ALL", "en_US")
+```
+
+Downloading and loading the data:
+
+```{r echo = TRUE, cache = TRUE} 
 storm_data_url <- 
     "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 download.file(storm_data_url, destfile = "stormdata.csv.bz2", method = "curl")
@@ -37,6 +57,8 @@ c("DC", "AL","MT","AK","NE","AZ","NV","AR","NH","CA","NJ","CO","NM","CT","NY",
 "IA","SC","KS","SD","KY","TN","LA","TX","ME","UT","MD","VT","MA","VA",
 "MI","WA","MN","WV","MS","WI","MO","WY")
 
+us_states_and_dc
+
 storm_data <- storm_data[storm_data$STATE %in% us_states_and_dc,]
 ```
 
@@ -45,6 +67,7 @@ Converting dates columns:
 ```{r echo = TRUE} 
 storm_data$BGN_DATE <- as.Date(storm_data$BGN_DATE, "%m/%d/%Y")
 storm_data$END_DATE <- as.Date(storm_data$END_DATE, "%m/%d/%Y")
+storm_data$YEAR <- as.integer(format(storm_data$BGN_DATE, "%Y"))
 ```
 
 Normalizing Property damage:
@@ -119,7 +142,6 @@ for(exp in as.character(1:10)) {
 
 ```
 
-
 Considering the data with valid property and crop manage:
 
 ```{r echo = TRUE} 
@@ -173,6 +195,17 @@ pop_harm_top_type_per_state <- pop_harm_top_type_per_state[,
 
 ```
 
+Computing populational (fatalities) damage per year:
+
+```{r echo = TRUE} 
+
+pop_harm_per_year <- aggregate(
+    storm_data["FATALITIES"],
+    by=storm_data["YEAR"],
+    FUN=sum)
+
+```
+
 Computing economical (property and crop) damage per state and event type:
 
 ```{r echo = TRUE} 
@@ -209,10 +242,57 @@ eco_harm_top_type_per_state <- aggregate(
 eco_harm_top_type_per_state <- merge (
     eco_harm_top_type_per_state, eco_harm_per_evtype)
 
-]
+```
+
+Computing economical (property and crop) damage per year:
+
+```{r echo = TRUE} 
+
+storm_data$ECODMGINM <- (storm_data$ECODMG / (1000000))
+
+eco_harm_per_year <- aggregate(
+    storm_data["ECODMGINM"],
+    by=storm_data["YEAR"],
+    FUN=sum)
 
 ```
 
+# Results
 
+POPULATIONAL damage per year:
+
+```{r echo = TRUE} 
+qplot(
+    YEAR,
+    FATALITIES,
+    data = pop_harm_per_year,
+    xlab = "Year",
+    ylab = "Fatalities",
+    geom=c("line"))
+```
+
+The most harmful events per state in terms of POPULATIONAL impacts are:
+
+```{r echo = TRUE} 
+pop_harm_top_type_per_state
+```
+
+ECONOMICAL damage per year:
+
+```{r echo = TRUE} 
+qplot(
+    YEAR,
+    ECODMGINM,
+    data = eco_harm_per_year,
+    xlab = "Year",
+    ylab = "Economical damage (USD millions)",
+    geom=c("line"))
+```
+
+The most harmful events per state in terms of ECONOMICAL impacts are:
+
+```{r echo = TRUE} 
+eco_harm_top_type_per_state
+```
 
 
